@@ -8,6 +8,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import joblib
 from sklearn.base import clone
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.inspection import permutation_importance
@@ -32,9 +33,12 @@ RANDOM_STATE = 42
 # The script is in src, so parents[1] gives the main project folder.
 project_folder = Path(__file__).resolve().parents[1]
 
-data_file = project_folder / "data" / "ACME-HappinessSurvey2020.xlsx"
-output_folder = project_folder / "outputs"
-output_folder.mkdir(exist_ok=True)
+data_file = project_folder / "data" / "raw" / "ACME-HappinessSurvey2020.xlsx"
+figures_folder = project_folder / "reports" / "figures"
+figures_folder.mkdir(parents=True, exist_ok=True)
+reports_folder = project_folder / "reports"
+models_folder = project_folder / "models"
+models_folder.mkdir(parents=True, exist_ok=True)
 
 print("Project folder:", project_folder)
 print("Looking for data at:", data_file)
@@ -86,7 +90,7 @@ sns.heatmap(data.corr(), annot=True, cmap="coolwarm", center=0,
             fmt=".2f", ax=axes[1])
 axes[1].set_title("Correlation matrix")
 fig.tight_layout()
-fig.savefig(output_folder / "data_overview.png", dpi=200)
+fig.savefig(figures_folder / "data_overview.png", dpi=200)
 # plt.show()
 plt.close(fig)
 
@@ -146,7 +150,7 @@ for model_name, model in models.items():
 model_results = pd.DataFrame(model_results).sort_values(
     ["F1 mean", "Accuracy mean"], ascending=False
 )
-model_results.to_csv(output_folder / "model_comparison.csv", index=False)
+model_results.to_csv(reports_folder / "model_comparison.csv", index=False)
 print("\nModel comparison using training data:")
 print(model_results.round(3).to_string(index=False))
 
@@ -168,6 +172,7 @@ grid_search = GridSearchCV(
 )
 grid_search.fit(X_train, y_train)
 best_model = grid_search.best_estimator_
+joblib.dump(best_model, models_folder / "gradient_boosting_model.joblib")
 
 print("\nBest Gradient Boosting parameters:")
 print(grid_search.best_params_)
@@ -198,7 +203,7 @@ ConfusionMatrixDisplay.from_predictions(
     cmap="Blues", ax=ax,
 )
 fig.tight_layout()
-fig.savefig(output_folder / "confusion_matrix.png", dpi=200)
+fig.savefig(figures_folder / "confusion_matrix.png", dpi=200)
 # plt.show()
 plt.close(fig)
 
@@ -217,7 +222,7 @@ importance_table = pd.DataFrame({
     "Importance std": importance.importances_std,
 }).sort_values("Importance mean", ascending=False)
 
-importance_table.to_csv(output_folder / "feature_importance.csv", index=False)
+importance_table.to_csv(reports_folder / "feature_importance.csv", index=False)
 print("\nPermutation feature importance:")
 print(importance_table.round(3).to_string(index=False))
 
@@ -229,7 +234,7 @@ ax.axvline(0, color="black", linewidth=0.8)
 ax.set_title("Permutation feature importance")
 ax.set_xlabel("Decrease in test F1 score after shuffling")
 fig.tight_layout()
-fig.savefig(output_folder / "feature_importance.png", dpi=200)
+fig.savefig(figures_folder / "feature_importance.png", dpi=200)
 # plt.show()
 plt.close(fig)
 
@@ -270,7 +275,7 @@ subset_results = subset_results.sort_values(
     ["Combined score", "Number of features"], ascending=[False, True]
 )
 subset_results.to_csv(
-    output_folder / "feature_subset_results.csv", index=False
+    reports_folder / "feature_subset_results.csv", index=False
 )
 
 best_subset = subset_results.iloc[0]
@@ -294,6 +299,8 @@ final_summary = pd.DataFrame([{
     "Subset CV accuracy": best_subset["CV accuracy"],
     "Subset CV F1": best_subset["CV F1"],
 }])
-final_summary.to_csv(output_folder / "final_summary.csv", index=False)
+final_summary.to_csv(reports_folder / "final_summary.csv", index=False)
 
-print(f"\nAll tables and figures were saved in: {output_folder}")
+print(f"\nTables were saved in: {reports_folder}")
+print(f"Figures were saved in: {figures_folder}")
+print(f"Model was saved in: {models_folder}")
